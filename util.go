@@ -17,7 +17,8 @@ import (
 )
 
 type BodyMap struct {
-	sm sync.Map
+	Map map[string]interface{}
+	mu  sync.RWMutex
 }
 
 //设置参数
