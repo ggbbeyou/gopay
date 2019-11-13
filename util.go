@@ -10,37 +10,37 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/parnurzeal/gorequest"
 )
 
-type BodyMap map[string]interface{}
+type BodyMap struct {
+	sm sync.Map
+}
 
 //设置参数
-//    value：仅支持类型 string,int,int64,float32,float64,ptr,struct,slice,map 类型，其他类型一律设置空字符串
-func (bm BodyMap) Set(key string, value interface{}) {
+//    value：仅支持类型 string,int,int64,float32,float64,ptr,struct,slice,map 类型
+func (bm *BodyMap) Set(key string, value interface{}) {
 	vKind := reflect.ValueOf(value).Kind()
 	switch vKind {
 	case reflect.String:
-		bm[key] = value.(string)
+		value = value.(string)
 	case reflect.Int:
-		bm[key] = Int2String(value.(int))
+		value = Int2String(value.(int))
 	case reflect.Int64:
-		bm[key] = Int642String(value.(int64))
+		value = Int642String(value.(int64))
 	case reflect.Float32:
-		bm[key] = Float32ToString(value.(float32))
+		value = Float32ToString(value.(float32))
 	case reflect.Float64:
-		bm[key] = Float64ToString(value.(float64))
-	case reflect.Ptr, reflect.Struct, reflect.Map, reflect.Slice:
-		bm[key] = value
-	default:
-		bm[key] = null
+		value = Float64ToString(value.(float64))
 	}
+	bm.sm.Store(key, value)
 }
 
 //获取参数
-func (bm BodyMap) Get(key string) string {
+func (bm *BodyMap) Get(key string) string {
 	if bm == nil {
 		return null
 	}
@@ -49,7 +49,7 @@ func (bm BodyMap) Get(key string) string {
 		ok    bool
 		v     string
 	)
-	if value, ok = bm[key]; !ok {
+	if value, ok = bm.sm.Load(key); !ok {
 		return null
 	}
 	if v, ok = value.(string); ok {
@@ -74,7 +74,7 @@ func jsonToString(v interface{}) (str string) {
 }
 
 //删除参数
-func (bm BodyMap) Remove(key string) {
+func (bm *BodyMap) Remove(key string) {
 	delete(bm, key)
 }
 
@@ -83,7 +83,7 @@ type xmlMapEntry struct {
 	Value   string `xml:",chardata"`
 }
 
-func (bm BodyMap) MarshalXML(e *xml.Encoder, start xml.StartElement) (err error) {
+func (bm *BodyMap) MarshalXML(e *xml.Encoder, start xml.StartElement) (err error) {
 	if len(bm) == 0 {
 		return nil
 	}
@@ -130,7 +130,7 @@ func (bm *BodyMap) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err err
 }
 
 // ("bar=baz&foo=quux") sorted by key.
-func (bm BodyMap) EncodeWeChatSignParams(apiKey string) string {
+func (bm *BodyMap) EncodeWeChatSignParams(apiKey string) string {
 	var (
 		buf     strings.Builder
 		keyList []string
@@ -154,7 +154,7 @@ func (bm BodyMap) EncodeWeChatSignParams(apiKey string) string {
 }
 
 // ("bar=baz&foo=quux") sorted by key.
-func (bm BodyMap) EncodeAliPaySignParams() string {
+func (bm *BodyMap) EncodeAliPaySignParams() string {
 	var (
 		buf     strings.Builder
 		keyList []string
